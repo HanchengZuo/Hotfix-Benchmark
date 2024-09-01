@@ -1,0 +1,77 @@
+diff --git a/clients/src/main/java/org/apache/kafka/clients/producer/internals/Partitioner.java b/clients/src/main/java/org/apache/kafka/clients/producer/internals/Partitioner.java
+index dfb936d8f0..8112e6d89d 100644
+--- a/clients/src/main/java/org/apache/kafka/clients/producer/internals/Partitioner.java
++++ b/clients/src/main/java/org/apache/kafka/clients/producer/internals/Partitioner.java
+@@ -56,15 +56,14 @@ public class Partitioner {
+                                                    + "].");
+             return partition;
+         } else if (key == null) {
+-            int nextValue = counter.getAndIncrement();
+-            List<PartitionInfo> availablePartitions = cluster.availablePartitionsForTopic(topic);
+-            if (availablePartitions.size() > 0) {
+-                int part = Utils.abs(nextValue) % availablePartitions.size();
+-                return availablePartitions.get(part).partition();
+-            } else {
+-                // no partitions are available, give a non-available partition
+-                return Utils.abs(nextValue) % numPartitions;
++            // choose the next available node in a round-robin fashion
++            for (int i = 0; i < numPartitions; i++) {
++                int part = Utils.abs(counter.getAndIncrement()) % numPartitions;
++                if (partitions.get(part).leader() != null)
++                    return part;
+             }
++            // no partitions are available, give a non-available partition
++            return Utils.abs(counter.getAndIncrement()) % numPartitions;
+         } else {
+             // hash the key to choose a partition
+             return Utils.abs(Utils.murmur2(key)) % numPartitions;
+diff --git a/clients/src/main/java/org/apache/kafka/common/Cluster.java b/clients/src/main/java/org/apache/kafka/common/Cluster.java
+index 60594a7dce..8fcd2916f1 100644
+--- a/clients/src/main/java/org/apache/kafka/common/Cluster.java
++++ b/clients/src/main/java/org/apache/kafka/common/Cluster.java
+@@ -25,7 +25,6 @@ public final class Cluster {
+     private final List<Node> nodes;
+     private final Map<TopicPartition, PartitionInfo> partitionsByTopicPartition;
+     private final Map<String, List<PartitionInfo>> partitionsByTopic;
+-    private final Map<String, List<PartitionInfo>> availablePartitionsByTopic;
+     private final Map<Integer, List<PartitionInfo>> partitionsByNode;
+     private final Map<Integer, Node> nodesById;
+ 
+@@ -69,18 +68,8 @@ public final class Cluster {
+             }
+         }
+         this.partitionsByTopic = new HashMap<String, List<PartitionInfo>>(partsForTopic.size());
+-        this.availablePartitionsByTopic = new HashMap<String, List<PartitionInfo>>(partsForTopic.size());
+-        for (Map.Entry<String, List<PartitionInfo>> entry : partsForTopic.entrySet()) {
+-            String topic = entry.getKey();
+-            List<PartitionInfo> partitionList = entry.getValue();
+-            this.partitionsByTopic.put(topic, Collections.unmodifiableList(partitionList));
+-            List<PartitionInfo> availablePartitions = new ArrayList<PartitionInfo>();
+-            for (PartitionInfo part : partitionList) {
+-                if (part.leader() != null)
+-                    availablePartitions.add(part);
+-            }
+-            this.availablePartitionsByTopic.put(topic, Collections.unmodifiableList(availablePartitions));
+-        }
++        for (Map.Entry<String, List<PartitionInfo>> entry : partsForTopic.entrySet())
++            this.partitionsByTopic.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+         this.partitionsByNode = new HashMap<Integer, List<PartitionInfo>>(partsForNode.size());
+         for (Map.Entry<Integer, List<PartitionInfo>> entry : partsForNode.entrySet())
+             this.partitionsByNode.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+@@ -154,15 +143,6 @@ public final class Cluster {
+         return this.partitionsByTopic.get(topic);
+     }
+ 
+-    /**
+-     * Get the list of available partitions for this topic
+-     * @param topic The topic name
+-     * @return A list of partitions
+-     */
+-    public List<PartitionInfo> availablePartitionsForTopic(String topic) {
+-        return this.availablePartitionsByTopic.get(topic);
+-    }
+-
+     /**
+      * Get the list of partitions whose leader is this node
+      * @param nodeId The node id
+

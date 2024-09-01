@@ -1,0 +1,73 @@
+diff --git a/clients/src/test/java/org/apache/kafka/clients/consumer/internals/ConsumerNetworkClientTest.java b/clients/src/test/java/org/apache/kafka/clients/consumer/internals/ConsumerNetworkClientTest.java
+index f8ad3caaaf..f90cd63692 100644
+--- a/clients/src/test/java/org/apache/kafka/clients/consumer/internals/ConsumerNetworkClientTest.java
++++ b/clients/src/test/java/org/apache/kafka/clients/consumer/internals/ConsumerNetworkClientTest.java
+@@ -100,35 +100,10 @@ public class ConsumerNetworkClientTest {
+ 
+     @Test
+     public void blockWhenPollConditionNotSatisfied() {
+-        long timeout = 4000L;
+-
+         NetworkClient mockNetworkClient = EasyMock.mock(NetworkClient.class);
+         ConsumerNetworkClient consumerClient = new ConsumerNetworkClient(mockNetworkClient, metadata, time, 100, 1000);
+ 
+-        EasyMock.expect(mockNetworkClient.inFlightRequestCount()).andReturn(1);
+-        EasyMock.expect(mockNetworkClient.poll(EasyMock.eq(timeout), EasyMock.anyLong())).andReturn(Collections.<ClientResponse>emptyList());
+-
+-        EasyMock.replay(mockNetworkClient);
+-
+-        consumerClient.poll(timeout, time.milliseconds(), new ConsumerNetworkClient.PollCondition() {
+-            @Override
+-            public boolean shouldBlock() {
+-                return true;
+-            }
+-        });
+-
+-        EasyMock.verify(mockNetworkClient);
+-    }
+-
+-    @Test
+-    public void blockOnlyForRetryBackoffIfNoInflightRequests() {
+-        long retryBackoffMs = 100L;
+-
+-        NetworkClient mockNetworkClient = EasyMock.mock(NetworkClient.class);
+-        ConsumerNetworkClient consumerClient = new ConsumerNetworkClient(mockNetworkClient, metadata, time, retryBackoffMs, 1000L);
+-
+-        EasyMock.expect(mockNetworkClient.inFlightRequestCount()).andReturn(0);
+-        EasyMock.expect(mockNetworkClient.poll(EasyMock.eq(retryBackoffMs), EasyMock.anyLong())).andReturn(Collections.<ClientResponse>emptyList());
++        EasyMock.expect(mockNetworkClient.poll(EasyMock.eq(Long.MAX_VALUE), EasyMock.anyLong())).andReturn(Collections.<ClientResponse>emptyList());
+ 
+         EasyMock.replay(mockNetworkClient);
+ 
+diff --git a/clients/src/test/java/org/apache/kafka/clients/consumer/internals/FetcherTest.java b/clients/src/test/java/org/apache/kafka/clients/consumer/internals/FetcherTest.java
+index 5822646dd8..faf6efa5d4 100644
+--- a/clients/src/test/java/org/apache/kafka/clients/consumer/internals/FetcherTest.java
++++ b/clients/src/test/java/org/apache/kafka/clients/consumer/internals/FetcherTest.java
+@@ -128,11 +128,13 @@ public class FetcherTest {
+ 
+         // normal fetch
+         fetcher.sendFetches();
++        assertTrue(fetcher.hasInFlightFetches());
+         assertFalse(fetcher.hasCompletedFetches());
+ 
+         client.prepareResponse(fetchResponse(this.records.buffer(), Errors.NONE.code(), 100L, 0));
+         consumerClient.poll(0);
+         assertTrue(fetcher.hasCompletedFetches());
++        assertFalse(fetcher.hasInFlightFetches());
+ 
+         Map<TopicPartition, List<ConsumerRecord<byte[], byte[]>>> partitionRecords = fetcher.fetchedRecords();
+         assertTrue(partitionRecords.containsKey(tp));
+@@ -153,11 +155,13 @@ public class FetcherTest {
+         subscriptions.seek(tp, 0);
+ 
+         fetcher.sendFetches();
++        assertTrue(fetcher.hasInFlightFetches());
+         assertFalse(fetcher.hasCompletedFetches());
+ 
+         client.prepareResponse(fetchResponse(this.records.buffer(), Errors.NOT_LEADER_FOR_PARTITION.code(), 100L, 0));
+         consumerClient.poll(0);
+         assertTrue(fetcher.hasCompletedFetches());
++        assertFalse(fetcher.hasInFlightFetches());
+ 
+         Map<TopicPartition, List<ConsumerRecord<byte[], byte[]>>> partitionRecords = fetcher.fetchedRecords();
+         assertFalse(partitionRecords.containsKey(tp));

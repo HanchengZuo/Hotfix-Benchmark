@@ -1,0 +1,159 @@
+You are an Automated Program Repair Tool for Hot Fix.
+
+Please help me check and fix any bugs in the multiple Java code files I uploaded. Maintain the original code structure and logic as much as possible, modifying only the problematic parts. Finally, provide the complete updated code files so that I can directly replace the old code for testing.
+
+Main code files:
+1. EstablishedResourceManagerConnection.java
+2. JobMaster.java
+
+Test Cases for Verification:
+```java
+	/**
+	 * Tests that we continue reconnecting to the latest known RM after a disconnection
+	 * message.
+	 */
+	@Test
+	public void testReconnectionAfterDisconnect() throws Exception {
+		final JobMaster jobMaster = createJobMaster(
+			JobMasterConfiguration.fromConfiguration(configuration),
+			jobGraph,
+			haServices,
+			new TestingJobManagerSharedServicesBuilder().build());
+
+		final JobMasterGateway jobMasterGateway = jobMaster.getSelfGateway(JobMasterGateway.class);
+
+		jobMaster.start(jobMasterId, testingTimeout);
+
+		try {
+			final TestingResourceManagerGateway testingResourceManagerGateway = new TestingResourceManagerGateway();
+			final BlockingQueue<JobMasterId> registrationsQueue = new ArrayBlockingQueue<>(1);
+
+			testingResourceManagerGateway.setRegisterJobManagerConsumer(
+				jobMasterIdResourceIDStringJobIDTuple4 -> registrationsQueue.offer(jobMasterIdResourceIDStringJobIDTuple4.f0));
+
+			rpcService.registerGateway(testingResourceManagerGateway.getAddress(), testingResourceManagerGateway);
+
+			final ResourceManagerId resourceManagerId = testingResourceManagerGateway.getFencingToken();
+			rmLeaderRetrievalService.notifyListener(
+				testingResourceManagerGateway.getAddress(),
+				resourceManagerId.toUUID());
+
+			// wait for first registration attempt
+			final JobMasterId firstRegistrationAttempt = registrationsQueue.take();
+
+			assertThat(firstRegistrationAttempt, equalTo(jobMasterId));
+
+			assertThat(registrationsQueue.isEmpty(), is(true));
+			jobMasterGateway.disconnectResourceManager(resourceManagerId, new FlinkException("Test exception"));
+
+			// wait for the second registration attempt after the disconnect call
+			assertThat(registrationsQueue.take(), equalTo(jobMasterId));
+		} finally {
+			RpcUtils.terminateRpcEndpoint(jobMaster, testingTimeout);
+		}
+	}
+
+	/**
+	 * Tests that the a JM connects to the leading RM after regaining leadership.
+	 */
+	@Test
+	public void testResourceManagerConnectionAfterRegainingLeadership() throws Exception {
+		final JobMaster jobMaster = createJobMaster(
+			JobMasterConfiguration.fromConfiguration(configuration),
+			jobGraph,
+			haServices,
+			new TestingJobManagerSharedServicesBuilder().build());
+
+		jobMaster.start(jobMasterId, testingTimeout);
+
+		try {
+			final TestingResourceManagerGateway testingResourceManagerGateway = new TestingResourceManagerGateway();
+
+			final BlockingQueue<JobMasterId> registrationQueue = new ArrayBlockingQueue<>(1);
+			testingResourceManagerGateway.setRegisterJobManagerConsumer(
+				jobMasterIdResourceIDStringJobIDTuple4 -> registrationQueue.offer(jobMasterIdResourceIDStringJobIDTuple4.f0));
+
+			final String resourceManagerAddress = testingResourceManagerGateway.getAddress();
+			rpcService.registerGateway(resourceManagerAddress, testingResourceManagerGateway);
+
+			rmLeaderRetrievalService.notifyListener(resourceManagerAddress, testingResourceManagerGateway.getFencingToken().toUUID());
+
+			final JobMasterId firstRegistrationAttempt = registrationQueue.take();
+
+			assertThat(firstRegistrationAttempt, equalTo(jobMasterId));
+
+			jobMaster.suspend(new FlinkException("Test exception."), testingTimeout).get();
+
+			final JobMasterId jobMasterId2 = JobMasterId.generate();
+
+			jobMaster.start(jobMasterId2, testingTimeout).get();
+
+			final JobMasterId secondRegistrationAttempt = registrationQueue.take();
+
+			assertThat(secondRegistrationAttempt, equalTo(jobMasterId2));
+		} finally {
+			RpcUtils.terminateRpcEndpoint(jobMaster, testingTimeout);
+		}
+	}
+```
+
+Error Stack Trace from the Failing Test Case:
+The test is stuck at this point and won't continue:
+```
+-------------------------------------------------------
+ T E S T S
+-------------------------------------------------------
+Running org.apache.flink.runtime.jobmaster.JobMasterTest
+Running org.apache.flink.runtime.jobmaster.JobResultTest
+Running org.apache.flink.runtime.jobmaster.JobManagerRunnerTest
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.055 sec - in org.apache.flink.runtime.jobmaster.JobResultTest
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.495 sec - in org.apache.flink.runtime.jobmaster.JobManagerRunnerTest
+```
+
+Localized Bug Locations (from fault localization):
+- File: `EstablishedResourceManagerConnection.java`
+  - method: `private final ResourceManagerId resourceManagerId;`
+
+- File: `EstablishedResourceManagerConnection.java`
+  - method: `EstablishedResourceManagerConnection`
+
+- File: `EstablishedResourceManagerConnection.java`
+  - method: `public ResourceManagerId getResourceManagerId()`
+
+- File: `JobMaster.java`
+  - method: `public void disconnectResourceManager`
+
+- File: `JobMaster.java`
+  - method: `private boolean isConnectingToResourceManager(ResourceManagerId resourceManagerId)`
+
+- File: `JobMaster.java`
+  - method: `private Acknowledge startJobExecution(JobMasterId newJobMasterId) throws Exception`
+
+- File: `JobMaster.java`
+  - method: `private void startJobMasterServices() throws Exception`
+
+- File: `JobMaster.java`
+  - method: `private void assignExecutionGraph`
+
+- File: `JobMaster.java`
+  - method: `private void scheduleExecutionGraph()`
+
+- File: `JobMaster.java`
+  - method: `private void notifyOfNewResourceManagerLeader(final String resourceManagerAddress, final ResourceManagerId resourceManagerId)`
+
+- File: `JobMaster.java`
+  - method: `private void createResourceManagerConnection(String resourceManagerAddress, ResourceManagerId resourceManagerId)`
+
+- File: `JobMaster.java`
+  - method: `private void establishResourceManagerConnection(final JobMasterRegistrationSuccess success)`
+
+- File: `JobMaster.java`
+  - method: `protected void onRegistrationSuccess(final JobMasterRegistrationSuccess success)`
+
+- File: `JobMaster.java`
+  - method: `private class ResourceManagerHeartbeatListener implements HeartbeatListener<Void, Void>`
+
+Issue title for this bug:
+```text
+Retry JM-RM connection in case of explicit disconnect
+```

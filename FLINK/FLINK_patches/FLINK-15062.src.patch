@@ -1,0 +1,63 @@
+diff --git a/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/AbstractOrcColumnVector.java b/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/AbstractOrcColumnVector.java
+index 61511f98bd8..3d68bc61648 100644
+--- a/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/AbstractOrcColumnVector.java
++++ b/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/AbstractOrcColumnVector.java
+@@ -113,7 +113,7 @@ public abstract class AbstractOrcColumnVector implements
+ 			case DATE:
+ 				return createLongVector(batchSize, dateToInternal((Date) value));
+ 			case TIMESTAMP_WITHOUT_TIME_ZONE:
+-				return createTimestampVector(batchSize, value);
++				return createTimestampVector(batchSize, (LocalDateTime) value);
+ 			default:
+ 				throw new UnsupportedOperationException("Unsupported type: " + type);
+ 		}
+@@ -176,15 +176,20 @@ public abstract class AbstractOrcColumnVector implements
+ 		return dcv;
+ 	}
+ 
+-	private static TimestampColumnVector createTimestampVector(int batchSize, Object value) {
++	private static TimestampColumnVector createTimestampVector(int batchSize, LocalDateTime value) {
+ 		TimestampColumnVector lcv = new TimestampColumnVector(batchSize);
+ 		if (value == null) {
+ 			lcv.noNulls = false;
+ 			lcv.isNull[0] = true;
+ 			lcv.isRepeating = true;
+ 		} else {
+-			Timestamp timestamp = value instanceof LocalDateTime ?
+-				Timestamp.valueOf((LocalDateTime) value) : (Timestamp) value;
++			long epochDay = value.toLocalDate().toEpochDay();
++			long nanoOfDay = value.toLocalTime().toNanoOfDay();
++
++			long millisecond = epochDay * 24 * 60 * 60 * 1000 + nanoOfDay / 1_000_000;
++			int nanoOfSecond = (int) (nanoOfDay % 1_000_000_000);
++			Timestamp timestamp = new Timestamp(millisecond);
++			timestamp.setNanos(nanoOfSecond);
+ 			lcv.fill(timestamp);
+ 			lcv.isNull[0] = false;
+ 		}
+diff --git a/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/OrcTimestampColumnVector.java b/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/OrcTimestampColumnVector.java
+index 6917e1183da..dec2515f9fb 100644
+--- a/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/OrcTimestampColumnVector.java
++++ b/flink-formats/flink-orc/src/main/java/org/apache/flink/orc/vector/OrcTimestampColumnVector.java
+@@ -22,8 +22,6 @@ import org.apache.flink.table.dataformat.SqlTimestamp;
+ 
+ import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
+ 
+-import java.sql.Timestamp;
+-
+ /**
+  * This column vector is used to adapt hive's TimestampColumnVector to
+  * Flink's TimestampColumnVector.
+@@ -41,8 +39,8 @@ public class OrcTimestampColumnVector extends AbstractOrcColumnVector implements
+ 	@Override
+ 	public SqlTimestamp getTimestamp(int i, int precision) {
+ 		int index = vector.isRepeating ? 0 : i;
+-		Timestamp timestamp = new Timestamp(vector.time[index]);
+-		timestamp.setNanos(vector.nanos[index]);
+-		return SqlTimestamp.fromTimestamp(timestamp);
++		return SqlTimestamp.fromEpochMillis(
++				vector.time[index],
++				SqlTimestamp.isCompact(precision) ? 0 : vector.nanos[index] % 1_000_000);
+ 	}
+ }
+

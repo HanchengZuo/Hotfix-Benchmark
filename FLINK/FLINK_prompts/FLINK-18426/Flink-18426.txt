@@ -1,0 +1,89 @@
+You are an Automated Program Repair Tool for Hot Fix.
+
+Please help me check and fix the bugs in the Java code file I uploaded. Maintain the original code structure and logic as much as possible, modifying only the problematic parts. Finally, provide the complete updated code files so that I can directly replace the old code for testing.
+
+Main code file: ClusterOptions.java
+
+Test Case for Verification:
+```java
+	@Test
+	public void testConfigurationWithDeprecatedOptions() {
+		final Configuration configuration = new Configuration();
+
+		final Duration refusedRegistrationBackoff = Duration.ofMinutes(42L);
+		final Duration registrationMaxBackoff = Duration.ofSeconds(1L);
+		final Duration initialRegistrationBackoff = Duration.ofHours(1337L);
+
+		configuration.set(TaskManagerOptions.REFUSED_REGISTRATION_BACKOFF, refusedRegistrationBackoff);
+		configuration.set(TaskManagerOptions.REGISTRATION_MAX_BACKOFF, registrationMaxBackoff);
+		configuration.set(TaskManagerOptions.INITIAL_REGISTRATION_BACKOFF, initialRegistrationBackoff);
+
+		final RetryingRegistrationConfiguration retryingRegistrationConfiguration = RetryingRegistrationConfiguration.fromConfiguration(configuration);
+
+		assertThat(retryingRegistrationConfiguration.getInitialRegistrationTimeoutMillis(), is(ClusterOptions.INITIAL_REGISTRATION_TIMEOUT.defaultValue()));
+		assertThat(retryingRegistrationConfiguration.getRefusedDelayMillis(), is(ClusterOptions.REFUSED_REGISTRATION_DELAY.defaultValue()));
+		assertThat(retryingRegistrationConfiguration.getMaxRegistrationTimeoutMillis(), is(ClusterOptions.MAX_REGISTRATION_TIMEOUT.defaultValue()));
+	}
+```
+
+Error Stack Trace from the Failing Test Case:
+```
+[ERROR] testConfigurationWithDeprecatedOptions(org.apache.flink.runtime.registration.RetryingRegistrationConfigurationTest)  Time elapsed: 0.032 s  <<< ERROR!
+java.lang.IllegalArgumentException: Could not parse value 'PT1337H' for key 'cluster.registration.initial-timeout'.
+        at org.apache.flink.configuration.Configuration.getOptional(Configuration.java:753)
+        at org.apache.flink.configuration.Configuration.getLong(Configuration.java:298)
+        at org.apache.flink.runtime.registration.RetryingRegistrationConfiguration.fromConfiguration(RetryingRegistrationConfiguration.java:72)
+        at org.apache.flink.runtime.registration.RetryingRegistrationConfigurationTest.testConfigurationWithDeprecatedOptions(RetryingRegistrationConfigurationTest.java:72)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+        at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+        at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+        at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+        at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+        at org.junit.rules.RunRules.evaluate(RunRules.java:20)
+        at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+        at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+        at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+        at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+        at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+        at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+        at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+        at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+        at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+        at org.apache.maven.surefire.junit4.JUnit4Provider.execute(JUnit4Provider.java:365)
+        at org.apache.maven.surefire.junit4.JUnit4Provider.executeWithRerun(JUnit4Provider.java:273)
+        at org.apache.maven.surefire.junit4.JUnit4Provider.executeTestSet(JUnit4Provider.java:238)
+        at org.apache.maven.surefire.junit4.JUnit4Provider.invoke(JUnit4Provider.java:159)
+        at org.apache.maven.surefire.booter.ForkedBooter.invokeProviderInSameClassLoader(ForkedBooter.java:384)
+        at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:345)
+        at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:126)
+        at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:418)
+Caused by: java.lang.NumberFormatException: For input string: "PT1337H"
+        at java.lang.NumberFormatException.forInputString(NumberFormatException.java:65)
+        at java.lang.Long.parseLong(Long.java:589)
+        at java.lang.Long.parseLong(Long.java:631)
+        at org.apache.flink.configuration.Configuration.convertToLong(Configuration.java:1002)
+        at org.apache.flink.configuration.Configuration.convertValue(Configuration.java:871)
+        at org.apache.flink.configuration.Configuration.lambda$getOptional$2(Configuration.java:750)
+        at java.util.Optional.map(Optional.java:215)
+        at org.apache.flink.configuration.Configuration.getOptional(Configuration.java:750)
+        ... 30 more
+```
+
+Localized Bug Locations (from fault localization):
+- File: `ClusterOptions.java`
+  - method: `public static final ConfigOption<Long> INITIAL_REGISTRATION_TIMEOUT`
+
+- File: `ClusterOptions.java`
+  - method: `public static final ConfigOption<Long> MAX_REGISTRATION_TIMEOUT`
+
+- File: `ClusterOptions.java`
+  - method: `public static final ConfigOption<Long> REFUSED_REGISTRATION_DELAY`
+
+Issue title for this bug:
+```text
+Incompatible deprecated key type for registration cluster options
+```

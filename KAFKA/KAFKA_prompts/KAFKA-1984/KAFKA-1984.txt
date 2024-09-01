@@ -1,0 +1,114 @@
+You are an Automated Program Repair Tool for Hot Fix.
+
+Please help me check and fix any bugs in the multiple Java code files I uploaded. Maintain the original code structure and logic as much as possible, modifying only the problematic parts. Finally, provide the complete updated code files so that I can directly replace the old code for testing.
+
+Main code files:
+1. Partitioner.java
+2. Cluster.java
+
+Test Case for Verification:
+```java
+public class PartitionerTest {
+
+    private byte[] key = "key".getBytes();
+    private Partitioner partitioner = new Partitioner();
+    private Node node0 = new Node(0, "localhost", 99);
+    private Node node1 = new Node(1, "localhost", 100);
+    private Node node2 = new Node(2, "localhost", 101);
+    private Node[] nodes = new Node[] {node0, node1, node2};
+    private String topic = "test";
+    private List<PartitionInfo> partitions = asList(new PartitionInfo(topic, 1, null, nodes, nodes),
+                                                    new PartitionInfo(topic, 2, node1, nodes, nodes),
+                                                    new PartitionInfo(topic, 0, node0, nodes, nodes));
+    private Cluster cluster = new Cluster(asList(node0, node1, node2), partitions);
+
+    @Test
+    public void testUserSuppliedPartitioning() {
+        assertEquals("If the user supplies a partition we should use it.", 0, partitioner.partition("test", key, 0, cluster));
+    }
+
+    @Test
+    public void testKeyPartitionIsStable() {
+        int partition = partitioner.partition("test", key, null, cluster);
+        assertEquals("Same key should yield same partition", partition, partitioner.partition("test", key, null, cluster));
+    }
+
+    @Test
+    public void testRoundRobinWithUnavailablePartitions() {
+        // When there are some unavailable partitions, we want to make sure that (1) we also pick an available partition,
+        // and (2) the available partitions are selected in a round robin way.
+        int countForPart0 = 0;
+        int countForPart2 = 0;
+        for (int i = 1; i <= 100; i++) {
+            int part = partitioner.partition("test", null, null, cluster);
+            assertTrue("We should never choose a leader-less node in round robin", part == 0 || part == 2);
+            if (part == 0)
+                countForPart0++;
+            else
+                countForPart2++;
+        }
+        assertEquals("The distribution between two available partitions should be even", countForPart0, countForPart2);
+    }
+}
+```
+
+Error Stack Trace from the Failing Test Case:
+```
+testRoundRobinWithUnavailablePartitions
+java.lang.AssertionError: We should never choose a leader-less node in round robin
+	at org.junit.Assert.fail(Assert.java:91)
+	at org.junit.Assert.assertTrue(Assert.java:43)
+	at org.apache.kafka.clients.producer.PartitionerTest.testRoundRobinWithUnavailablePartitions(PartitionerTest.java:61)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:44)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:15)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:41)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:20)
+	at org.junit.runners.BlockJUnit4ClassRunner.runNotIgnored(BlockJUnit4ClassRunner.java:79)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:71)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:49)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:193)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:52)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:191)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:42)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:184)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:236)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecuter.runTestClass(JUnitTestClassExecuter.java:86)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecuter.execute(JUnitTestClassExecuter.java:49)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestClassProcessor.processTestClass(JUnitTestClassProcessor.java:69)
+	at org.gradle.api.internal.tasks.testing.SuiteTestClassProcessor.processTestClass(SuiteTestClassProcessor.java:48)
+	at sun.reflect.GeneratedMethodAccessor5.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.gradle.messaging.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:35)
+	at org.gradle.messaging.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:24)
+	at org.gradle.messaging.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:32)
+	at org.gradle.messaging.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:93)
+	at com.sun.proxy.$Proxy2.processTestClass(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.processTestClass(TestWorker.java:105)
+	at sun.reflect.GeneratedMethodAccessor4.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.gradle.messaging.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:35)
+	at org.gradle.messaging.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:24)
+	at org.gradle.messaging.remote.internal.hub.MessageHub$Handler.run(MessageHub.java:355)
+	at org.gradle.internal.concurrent.DefaultExecutorFactory$StoppableExecutorImpl$1.run(DefaultExecutorFactory.java:64)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:750)
+```
+
+Localized Bug Locations (from fault localization):
+- File: `Partitioner.java`
+  - method: `public int partition(String topic, byte[] key, Integer partition, Cluster cluster)`
+
+- File: `Cluster.java`
+  - method: `public Cluster(Collection<Node> nodes, Collection<PartitionInfo> partitions)`
+
+Issue title for this bug:
+```text
+java producer may miss an available partition
+```

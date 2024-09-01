@@ -1,0 +1,117 @@
+You are an Automated Program Repair Tool for Hot Fix.
+
+Please help me check and fix any bugs in the multiple Java code files I uploaded. Maintain the original code structure and logic as much as possible, modifying only the problematic parts. Finally, provide the complete updated code files so that I can directly replace the old code for testing.
+
+Main code files:
+1. CEPPatternOperator.java
+2. KeyedCEPPatternOperator.java
+
+Test Cases for Verification:
+```java
+public class CEPOperatorTest extends TestLogger {
+
+	@Test
+	public void testCEPOperatorWatermarkForwarding() throws Exception {
+		OneInputStreamOperatorTestHarness<Integer, Map<String, Integer>> harness = new OneInputStreamOperatorTestHarness<>(
+			new CEPPatternOperator<Integer>(
+				IntSerializer.INSTANCE,
+				false,
+				new DummyNFAFactory<>(IntSerializer.INSTANCE))
+		);
+
+		harness.open();
+
+		Watermark expectedWatermark = new Watermark(42L);
+
+		harness.processWatermark(expectedWatermark);
+
+		Object watermark = harness.getOutput().poll();
+
+		assertTrue(watermark instanceof Watermark);
+		assertEquals(expectedWatermark, watermark);
+
+		harness.close();
+	}
+
+	@Test
+	public void testKeyedCEPOperatorWatermarkForwarding() throws Exception {
+		KeySelector<Integer, Integer> keySelector = new KeySelector<Integer, Integer>() {
+			private static final long serialVersionUID = -4873366487571254798L;
+
+			@Override
+			public Integer getKey(Integer value) throws Exception {
+				return value;
+			}
+		};
+
+		OneInputStreamOperatorTestHarness<Integer, Map<String, Integer>> harness = new OneInputStreamOperatorTestHarness<>(
+			new KeyedCEPPatternOperator<Integer, Integer>(
+				IntSerializer.INSTANCE,
+				false,
+				keySelector,
+				IntSerializer.INSTANCE,
+			new DummyNFAFactory<>(IntSerializer.INSTANCE))
+		);
+
+		harness.configureForKeyedStream(keySelector, BasicTypeInfo.INT_TYPE_INFO);
+
+		harness.open();
+
+		Watermark expectedWatermark = new Watermark(42L);
+
+		harness.processWatermark(expectedWatermark);
+
+		Object watermark = harness.getOutput().poll();
+
+		assertTrue(watermark instanceof Watermark);
+		assertEquals(expectedWatermark, watermark);
+
+		harness.close();
+	}
+
+	public static class DummyNFAFactory<T> implements NFACompiler.NFAFactory<T> {
+
+		private static final long serialVersionUID = 1173020762472766713L;
+
+		private final TypeSerializer<T> inputTypeSerializer;
+
+		public DummyNFAFactory(TypeSerializer<T> inputTypeSerializer) {
+			this.inputTypeSerializer = inputTypeSerializer;
+		}
+
+		@Override
+		public NFA<T> createNFA() {
+			return new NFA<>(inputTypeSerializer.duplicate(), 0);
+		}
+	}
+}
+```
+
+Error Stack Trace from the Failing Test Case:
+```
+testCEPOperatorWatermarkForwarding(org.apache.flink.cep.operator.CEPOperatorTest)  Time elapsed: 0.206 sec  <<< FAILURE!
+java.lang.AssertionError: null
+        at org.junit.Assert.fail(Assert.java:86)
+        at org.junit.Assert.assertTrue(Assert.java:41)
+        at org.junit.Assert.assertTrue(Assert.java:52)
+        at org.apache.flink.cep.operator.CEPOperatorTest.testCEPOperatorWatermarkForwarding(CEPOperatorTest.java:55)
+
+testKeyedCEPOperatorWatermarkForwarding(org.apache.flink.cep.operator.CEPOperatorTest)  Time elapsed: 0.09 sec  <<< FAILURE!
+java.lang.AssertionError: null
+        at org.junit.Assert.fail(Assert.java:86)
+        at org.junit.Assert.assertTrue(Assert.java:41)
+        at org.junit.Assert.assertTrue(Assert.java:52)
+        at org.apache.flink.cep.operator.CEPOperatorTest.testKeyedCEPOperatorWatermarkForwarding(CEPOperatorTest.java:91)
+```
+
+Localized Bug Locations (from fault localization):
+- File: `CEPPatternOperator.java`
+  - method: `public void processWatermark(Watermark mark) throws Exception`
+
+- File: `KeyedCEPPatternOperator.java`
+  - method: `public void processWatermark(Watermark mark) throws Exception`
+
+Issue title for this bug:
+```text
+CEP operator does not forward watermarks properly
+```

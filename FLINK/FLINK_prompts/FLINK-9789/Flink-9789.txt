@@ -1,0 +1,201 @@
+You are an Automated Program Repair Tool for Hot Fix.
+
+Please help me check and fix any bugs in the multiple Java code files I uploaded. Maintain the original code structure and logic as much as possible, modifying only the problematic parts. Finally, provide the complete updated code files so that I can directly replace the old code for testing.
+
+Main code files:
+1. OneInputStreamTask.java
+2. TwoInputStreamTask.java
+3. OperatorChain.java
+
+Test Cases for Verification:
+```java
+@Test
+	public void testWatermarkMetrics() throws Exception {
+		final OneInputStreamTaskTestHarness<String, String> testHarness = new OneInputStreamTaskTestHarness<>(OneInputStreamTask::new, BasicTypeInfo.STRING_TYPE_INFO, BasicTypeInfo.STRING_TYPE_INFO);
+		OneInputStreamOperator<String, String> headOperator = new WatermarkMetricOperator();
+		OperatorID headOperatorId = new OperatorID();
+		OneInputStreamOperator<String, String> chainedOperator = new WatermarkMetricOperator();
+		OperatorID chainedOperatorId = new OperatorID();
+		testHarness.setupOperatorChain(headOperatorId, headOperator)
+			.chain(chainedOperatorId, chainedOperator, BasicTypeInfo.STRING_TYPE_INFO.createSerializer(new ExecutionConfig()))
+			.finish();
+
+		InterceptingOperatorMetricGroup headOperatorMetricGroup = new InterceptingOperatorMetricGroup();
+		InterceptingOperatorMetricGroup chainedOperatorMetricGroup = new InterceptingOperatorMetricGroup();
+		InterceptingTaskMetricGroup taskMetricGroup = new InterceptingTaskMetricGroup() {
+			@Override
+			public OperatorMetricGroup addOperator(OperatorID id, String name) {
+				if (id.equals(headOperatorId)) {
+					return headOperatorMetricGroup;
+				} else if (id.equals(chainedOperatorId)) {
+					return chainedOperatorMetricGroup;
+				} else {
+					return super.addOperator(id, name);
+				}
+			}
+		};
+		StreamMockEnvironment env = new StreamMockEnvironment(
+			testHarness.jobConfig, testHarness.taskConfig, testHarness.memorySize, new MockInputSplitProvider(), testHarness.bufferSize, new TestTaskStateManager()) {
+			@Override
+			public TaskMetricGroup getMetricGroup() {
+				return taskMetricGroup;
+			}
+		};
+		testHarness.invoke(env);
+		testHarness.waitForTaskRunning();
+
+		Gauge<Long> taskInputWatermarkGauge = (Gauge<Long>) taskMetricGroup.get(MetricNames.IO_CURRENT_INPUT_WATERMARK);
+		Gauge<Long> headInputWatermarkGauge = (Gauge<Long>) headOperatorMetricGroup.get(MetricNames.IO_CURRENT_INPUT_WATERMARK);
+		Gauge<Long> headOutputWatermarkGauge = (Gauge<Long>) headOperatorMetricGroup.get(MetricNames.IO_CURRENT_OUTPUT_WATERMARK);
+		Gauge<Long> chainedInputWatermarkGauge = (Gauge<Long>) chainedOperatorMetricGroup.get(MetricNames.IO_CURRENT_INPUT_WATERMARK);
+		Gauge<Long> chainedOutputWatermarkGauge = (Gauge<Long>) chainedOperatorMetricGroup.get(MetricNames.IO_CURRENT_OUTPUT_WATERMARK);
+
+		Assert.assertEquals("A metric was registered multiple times.",
+			5,
+			new HashSet<>(Arrays.asList(
+				taskInputWatermarkGauge,
+				headInputWatermarkGauge,
+				headOutputWatermarkGauge,
+				chainedInputWatermarkGauge,
+				chainedOutputWatermarkGauge))
+				.size());
+
+		Assert.assertEquals(Long.MIN_VALUE, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, chainedOutputWatermarkGauge.getValue().longValue());
+
+		testHarness.processElement(new Watermark(1L));
+		testHarness.waitForInputProcessing();
+		Assert.assertEquals(1L, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(1L, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(4L, chainedOutputWatermarkGauge.getValue().longValue());
+
+		testHarness.processElement(new Watermark(2L));
+		testHarness.waitForInputProcessing();
+		Assert.assertEquals(2L, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(4L, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(4L, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(8L, chainedOutputWatermarkGauge.getValue().longValue());
+		testHarness.endInput();
+		testHarness.waitForTaskCompletion();
+	}
+
+@Test
+	public void testWatermarkMetrics() throws Exception {
+		final TwoInputStreamTaskTestHarness<String, Integer, String> testHarness = new TwoInputStreamTaskTestHarness<>(TwoInputStreamTask::new, BasicTypeInfo.STRING_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.STRING_TYPE_INFO);
+		CoStreamMap<String, Integer, String> headOperator = new CoStreamMap<>(new IdentityMap());
+		final OperatorID headOperatorId = new OperatorID();
+		OneInputStreamTaskTest.WatermarkMetricOperator chainedOperator = new OneInputStreamTaskTest.WatermarkMetricOperator();
+		OperatorID chainedOperatorId = new OperatorID();
+		testHarness.setupOperatorChain(headOperatorId, headOperator)
+			.chain(chainedOperatorId, chainedOperator, BasicTypeInfo.STRING_TYPE_INFO.createSerializer(new ExecutionConfig()))
+			.finish();
+
+		InterceptingOperatorMetricGroup headOperatorMetricGroup = new InterceptingOperatorMetricGroup();
+		InterceptingOperatorMetricGroup chainedOperatorMetricGroup = new InterceptingOperatorMetricGroup();
+		InterceptingTaskMetricGroup taskMetricGroup = new InterceptingTaskMetricGroup() {
+			@Override
+			public OperatorMetricGroup addOperator(OperatorID id, String name) {
+				if (id.equals(headOperatorId)) {
+	@@ -489,13 +492,27 @@ public TaskMetricGroup getMetricGroup() {
+		testHarness.invoke(env);
+		testHarness.waitForTaskRunning();
+
+		Gauge<Long> taskInputWatermarkGauge = (Gauge<Long>) taskMetricGroup.get(MetricNames.IO_CURRENT_INPUT_WATERMARK);
+		Gauge<Long> headInput1WatermarkGauge = (Gauge<Long>) headOperatorMetricGroup.get(MetricNames.IO_CURRENT_INPUT_1_WATERMARK);
+		Gauge<Long> headInput2WatermarkGauge = (Gauge<Long>) headOperatorMetricGroup.get(MetricNames.IO_CURRENT_INPUT_2_WATERMARK);
+		Gauge<Long> headInputWatermarkGauge = (Gauge<Long>) headOperatorMetricGroup.get(MetricNames.IO_CURRENT_INPUT_WATERMARK);
+		Gauge<Long> headOutputWatermarkGauge = (Gauge<Long>) headOperatorMetricGroup.get(MetricNames.IO_CURRENT_OUTPUT_WATERMARK);
+		Gauge<Long> chainedInputWatermarkGauge = (Gauge<Long>) chainedOperatorMetricGroup.get(MetricNames.IO_CURRENT_INPUT_WATERMARK);
+		Gauge<Long> chainedOutputWatermarkGauge = (Gauge<Long>) chainedOperatorMetricGroup.get(MetricNames.IO_CURRENT_OUTPUT_WATERMARK);
+
+		Assert.assertEquals("A metric was registered multiple times.",
+			7,
+			new HashSet<>(Arrays.asList(
+				taskInputWatermarkGauge,
+				headInput1WatermarkGauge,
+				headInput2WatermarkGauge,
+				headInputWatermarkGauge,
+				headOutputWatermarkGauge,
+				chainedInputWatermarkGauge,
+				chainedOutputWatermarkGauge))
+				.size());
+
+		Assert.assertEquals(Long.MIN_VALUE, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headInput1WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headInput2WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, chainedOutputWatermarkGauge.getValue().longValue());
+
+		testHarness.processElement(new Watermark(1L), 0, 0);
+		testHarness.waitForInputProcessing();
+		Assert.assertEquals(Long.MIN_VALUE, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(1L, headInput1WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headInput2WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(Long.MIN_VALUE, chainedOutputWatermarkGauge.getValue().longValue());
+
+		testHarness.processElement(new Watermark(2L), 1, 0);
+		testHarness.waitForInputProcessing();
+		Assert.assertEquals(1L, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(1L, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(1L, headInput1WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, headInput2WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(1L, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(1L, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, chainedOutputWatermarkGauge.getValue().longValue());
+
+		testHarness.processElement(new Watermark(3L), 0, 0);
+		testHarness.waitForInputProcessing();
+		Assert.assertEquals(2L, taskInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, headInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(3L, headInput1WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, headInput2WatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, headOutputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(2L, chainedInputWatermarkGauge.getValue().longValue());
+		Assert.assertEquals(4L, chainedOutputWatermarkGauge.getValue().longValue());
+		testHarness.endInput();
+		testHarness.waitForTaskCompletion();
+	}
+```
+
+Error Stack Trace from the Failing Test Case:
+```
+testWatermarkMetrics(org.apache.flink.streaming.runtime.tasks.TwoInputStreamTaskTest)  Time elapsed: 0.879 sec  <<< FAILURE!
+java.lang.AssertionError: A metric was registered multiple times. expected:<7> but was:<5>
+        at org.junit.Assert.fail(Assert.java:88)
+        at org.junit.Assert.failNotEquals(Assert.java:834)
+        at org.junit.Assert.assertEquals(Assert.java:645)
+        at org.apache.flink.streaming.runtime.tasks.TwoInputStreamTaskTest.testWatermarkMetrics(TwoInputStreamTaskTest.java:503)
+
+testWatermarkMetrics(org.apache.flink.streaming.runtime.tasks.OneInputStreamTaskTest)  Time elapsed: 0.642 sec  <<< FAILURE!
+java.lang.AssertionError: A metric was registered multiple times. expected:<5> but was:<3>
+        at org.junit.Assert.fail(Assert.java:88)
+        at org.junit.Assert.failNotEquals(Assert.java:834)
+        at org.junit.Assert.assertEquals(Assert.java:645)
+        at org.apache.flink.streaming.runtime.tasks.OneInputStreamTaskTest.testWatermarkMetrics(OneInputStreamTaskTest.java:713)
+```
+
+Localized Bug Locations (from fault localization):
+- File: `OneInputStreamTask.java`
+  - method: `public void init() throws Exception`
+
+- File: `TwoInputStreamTask.java`
+  - method: `public void init() throws Exception`
+
+- File: `OperatorChain.java`
+  - method: `private <IN, OUT> WatermarkGaugeExposingOutput<StreamRecord<IN>> createChainedOperator`
+
+Issue title for this bug:
+```text
+Watermark metrics for an operator&task shadow each other
+```

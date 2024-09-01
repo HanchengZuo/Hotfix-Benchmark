@@ -1,0 +1,26 @@
+diff --git a/clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java b/clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java
+index 769d236351..2514e4fadf 100644
+--- a/clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java
++++ b/clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java
+@@ -91,9 +91,7 @@ public class ConfigDef {
+     public ConfigDef(ConfigDef base) {
+         configKeys = new LinkedHashMap<>(base.configKeys);
+         groups = new LinkedList<>(base.groups);
+-        // It is not safe to copy this from the parent because we may subsequently add to the set of configs and
+-        // invalidate this
+-        configsWithNoParent = null;
++        configsWithNoParent = base.configsWithNoParent == null ? null : new HashSet<>(base.configsWithNoParent);
+     }
+ 
+     /**
+@@ -530,8 +528,7 @@ public class ConfigDef {
+         return new ArrayList<>(undefinedConfigKeys);
+     }
+ 
+-    // package accessible for testing
+-    Set<String> getConfigsWithNoParent() {
++    private Set<String> getConfigsWithNoParent() {
+         if (this.configsWithNoParent != null) {
+             return this.configsWithNoParent;
+         }
+

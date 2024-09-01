@@ -1,0 +1,68 @@
+diff --git a/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/partition/consumer/UnionInputGate.java b/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/partition/consumer/UnionInputGate.java
+index 343bba71f42..115511215a7 100644
+--- a/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/partition/consumer/UnionInputGate.java
++++ b/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/partition/consumer/UnionInputGate.java
+@@ -32,6 +32,7 @@ import java.util.Optional;
+ import java.util.Set;
+ import java.util.concurrent.CompletableFuture;
+ import java.util.stream.Collectors;
++import java.util.stream.IntStream;
+ 
+ import static org.apache.flink.util.Preconditions.checkArgument;
+ import static org.apache.flink.util.Preconditions.checkNotNull;
+@@ -78,7 +79,8 @@ public class UnionInputGate extends InputGate {
+ 	 */
+ 	private final LinkedHashSet<IndexedInputGate> inputGatesWithData = new LinkedHashSet<>();
+ 
+-	private final int[] inputChannelToInputGateIndex;
++	/** Input channels across all unioned input gates. */
++	private final InputChannel[] inputChannels;
+ 
+ 	/**
+ 	 * A mapping from input gate index to (logical) channel index offset. Valid channel indexes go from 0
+@@ -99,16 +101,14 @@ public class UnionInputGate extends InputGate {
+ 
+ 		final int maxGateIndex = Arrays.stream(inputGates).mapToInt(IndexedInputGate::getGateIndex).max().orElse(0);
+ 		inputGateChannelIndexOffsets = new int[maxGateIndex + 1];
+-		int totalNumberOfInputChannels = Arrays.stream(inputGates).mapToInt(IndexedInputGate::getNumberOfInputChannels).sum();
+-		inputChannelToInputGateIndex = new int[totalNumberOfInputChannels];
+-
+ 		int currentNumberOfInputChannels = 0;
+ 		for (final IndexedInputGate inputGate : inputGates) {
+ 			inputGateChannelIndexOffsets[inputGate.getGateIndex()] = currentNumberOfInputChannels;
+-			int previousNumberOfInputChannels = currentNumberOfInputChannels;
+ 			currentNumberOfInputChannels += inputGate.getNumberOfInputChannels();
+-			Arrays.fill(inputChannelToInputGateIndex, previousNumberOfInputChannels, currentNumberOfInputChannels, inputGate.getGateIndex());
+ 		}
++		inputChannels = Arrays.stream(inputGates)
++			.flatMap(gate -> IntStream.range(0, gate.getNumberOfInputChannels()).mapToObj(gate::getChannel))
++			.toArray(InputChannel[]::new);
+ 
+ 		synchronized (inputGatesWithData) {
+ 			for (IndexedInputGate inputGate : inputGates) {
+@@ -134,13 +134,12 @@ public class UnionInputGate extends InputGate {
+ 	 */
+ 	@Override
+ 	public int getNumberOfInputChannels() {
+-		return inputChannelToInputGateIndex.length;
++		return inputChannels.length;
+ 	}
+ 
+ 	@Override
+ 	public InputChannel getChannel(int channelIndex) {
+-		int gateIndex = this.inputChannelToInputGateIndex[channelIndex];
+-		return inputGates[gateIndex].getChannel(channelIndex - inputGateChannelIndexOffsets[gateIndex]);
++		return inputChannels[channelIndex];
+ 	}
+ 
+ 	@Override
+@@ -261,7 +260,7 @@ public class UnionInputGate extends InputGate {
+ 		// BEWARE: consumption resumption only happens for streaming jobs in which all
+ 		// slots are allocated together so there should be no UnknownInputChannel. We
+ 		// will refactor the code to not rely on this assumption in the future.
+-		getChannel(channelIndex).resumeConsumption();
++		inputChannels[channelIndex].resumeConsumption();
+ 	}
+ 
+ 	@Override
+

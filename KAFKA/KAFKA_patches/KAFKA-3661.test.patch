@@ -1,0 +1,26 @@
+diff --git a/clients/src/test/java/org/apache/kafka/clients/consumer/RangeAssignorTest.java b/clients/src/test/java/org/apache/kafka/clients/consumer/RangeAssignorTest.java
+index 72febb02ca..13cce13817 100644
+--- a/clients/src/test/java/org/apache/kafka/clients/consumer/RangeAssignorTest.java
++++ b/clients/src/test/java/org/apache/kafka/clients/consumer/RangeAssignorTest.java
+@@ -53,6 +53,8 @@ public class RangeAssignorTest {
+         String consumerId = "consumer";
+ 
+         Map<String, Integer> partitionsPerTopic = new HashMap<>();
++        partitionsPerTopic.put(topic, 0);
++
+         Map<String, List<TopicPartition>> assignment = assignor.assign(partitionsPerTopic,
+                 Collections.singletonMap(consumerId, Arrays.asList(topic)));
+         assertEquals(Collections.singleton(consumerId), assignment.keySet());
+diff --git a/clients/src/test/java/org/apache/kafka/clients/consumer/RoundRobinAssignorTest.java b/clients/src/test/java/org/apache/kafka/clients/consumer/RoundRobinAssignorTest.java
+index 1d62700e5c..31598cd24b 100644
+--- a/clients/src/test/java/org/apache/kafka/clients/consumer/RoundRobinAssignorTest.java
++++ b/clients/src/test/java/org/apache/kafka/clients/consumer/RoundRobinAssignorTest.java
+@@ -47,6 +47,8 @@ public class RoundRobinAssignorTest {
+         String consumerId = "consumer";
+ 
+         Map<String, Integer> partitionsPerTopic = new HashMap<>();
++        partitionsPerTopic.put(topic, 0);
++
+         Map<String, List<TopicPartition>> assignment = assignor.assign(partitionsPerTopic,
+                 Collections.singletonMap(consumerId, Arrays.asList(topic)));
+ 

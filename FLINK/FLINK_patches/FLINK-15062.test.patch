@@ -1,0 +1,62 @@
+diff --git a/flink-formats/flink-orc/src/test/java/org/apache/flink/orc/OrcColumnarRowSplitReaderTest.java b/flink-formats/flink-orc/src/test/java/org/apache/flink/orc/OrcColumnarRowSplitReaderTest.java
+index cf932063c8b..7d709c1d640 100644
+--- a/flink-formats/flink-orc/src/test/java/org/apache/flink/orc/OrcColumnarRowSplitReaderTest.java
++++ b/flink-formats/flink-orc/src/test/java/org/apache/flink/orc/OrcColumnarRowSplitReaderTest.java
+@@ -45,7 +45,6 @@ import java.io.File;
+ import java.io.IOException;
+ import java.math.BigDecimal;
+ import java.sql.Date;
+-import java.sql.Timestamp;
+ import java.time.LocalDateTime;
+ import java.util.ArrayList;
+ import java.util.HashMap;
+@@ -284,11 +283,8 @@ public class OrcColumnarRowSplitReaderTest {
+ 			for (int i = 0; i < rowSize - 1; i++) {
+ 				col0.vector[i] = i;
+ 				col1.vector[i] = i;
+-
+-				Timestamp timestamp = toTimestamp(i);
+-				col2.time[i] = timestamp.getTime();
+-				col2.nanos[i] = timestamp.getNanos();
+-
++				col2.time[i] = i * 1000;
++				col2.nanos[i] = i;
+ 				col3.vector[i] = i;
+ 				col4.vector[i] = i;
+ 			}
+@@ -308,7 +304,7 @@ public class OrcColumnarRowSplitReaderTest {
+ 		// second test read.
+ 		FileInputSplit split = createSplits(new Path(file), 1)[0];
+ 
+-		int cnt = 0;
++		long cnt = 0;
+ 		Map<String, Object> partSpec = new HashMap<>();
+ 		partSpec.put("f5", true);
+ 		partSpec.put("f6", new Date(562423));
+@@ -356,7 +352,7 @@ public class OrcColumnarRowSplitReaderTest {
+ 					Assert.assertFalse(row.isNullAt(3));
+ 					Assert.assertFalse(row.isNullAt(4));
+ 					Assert.assertEquals(
+-							SqlTimestamp.fromTimestamp(toTimestamp(cnt)),
++							SqlTimestamp.fromEpochMillis(cnt * 1000, (int) cnt),
+ 							row.getTimestamp(0, 9));
+ 					Assert.assertEquals(cnt, row.getFloat(1), 0);
+ 					Assert.assertEquals(cnt, row.getDouble(2), 0);
+@@ -385,17 +381,6 @@ public class OrcColumnarRowSplitReaderTest {
+ 		assertEquals(rowSize, cnt);
+ 	}
+ 
+-	private static Timestamp toTimestamp(int i) {
+-		return new Timestamp(
+-						i + 1000,
+-						(i % 12) + 1,
+-						(i % 28) + 1,
+-						i % 24,
+-						i % 60,
+-						i % 60,
+-						i * 1_000 + i);
+-	}
+-
+ 	private OrcColumnarRowSplitReader createReader(
+ 			int[] selectedFields,
+ 			DataType[] fullTypes,

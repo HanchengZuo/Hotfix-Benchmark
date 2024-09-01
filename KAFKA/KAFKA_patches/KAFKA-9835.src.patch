@@ -1,0 +1,29 @@
+diff --git a/clients/src/main/java/org/apache/kafka/common/record/FileRecords.java b/clients/src/main/java/org/apache/kafka/common/record/FileRecords.java
+index 46ac481e77..c097f558a7 100644
+--- a/clients/src/main/java/org/apache/kafka/common/record/FileRecords.java
++++ b/clients/src/main/java/org/apache/kafka/common/record/FileRecords.java
+@@ -135,20 +135,17 @@ public class FileRecords extends AbstractRecords implements Closeable {
+      * @return A sliced wrapper on this message set limited based on the given position and size
+      */
+     public FileRecords slice(int position, int size) throws IOException {
+-        // Cache current size in case concurrent write changes it
+-        int currentSizeInBytes = sizeInBytes();
+-
+         if (position < 0)
+             throw new IllegalArgumentException("Invalid position: " + position + " in read from " + this);
+-        if (position > currentSizeInBytes - start)
++        if (position > sizeInBytes() - start)
+             throw new IllegalArgumentException("Slice from position " + position + " exceeds end position of " + this);
+         if (size < 0)
+             throw new IllegalArgumentException("Invalid size: " + size + " in read from " + this);
+ 
+         int end = this.start + position + size;
+         // handle integer overflow or if end is beyond the end of the file
+-        if (end < 0 || end > start + currentSizeInBytes)
+-            end = start + currentSizeInBytes;
++        if (end < 0 || end >= start + sizeInBytes())
++            end = start + sizeInBytes();
+         return new FileRecords(file, channel, this.start + position, end, true);
+     }
+ 
+

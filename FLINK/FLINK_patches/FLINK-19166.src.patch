@@ -1,0 +1,39 @@
+diff --git a/flink-table/flink-table-runtime-blink/src/main/java/org/apache/flink/table/filesystem/stream/StreamingFileWriter.java b/flink-table/flink-table-runtime-blink/src/main/java/org/apache/flink/table/filesystem/stream/StreamingFileWriter.java
+index 924ef982103..c2186bff9bc 100644
+--- a/flink-table/flink-table-runtime-blink/src/main/java/org/apache/flink/table/filesystem/stream/StreamingFileWriter.java
++++ b/flink-table/flink-table-runtime-blink/src/main/java/org/apache/flink/table/filesystem/stream/StreamingFileWriter.java
+@@ -79,10 +79,17 @@ public class StreamingFileWriter extends AbstractStreamOperator<CommitMessage>
+ 	public void initializeState(StateInitializationContext context) throws Exception {
+ 		super.initializeState(context);
+ 		buckets = bucketsBuilder.createBuckets(getRuntimeContext().getIndexOfThisSubtask());
++		helper = new StreamingFileSinkHelper<>(
++				buckets,
++				context.isRestored(),
++				context.getOperatorStateStore(),
++				getRuntimeContext().getProcessingTimeService(),
++				bucketCheckInterval);
+ 
+-		// Set listener before the initialization of Buckets.
+ 		inactivePartitions = new HashSet<>();
++		currentWatermark = Long.MIN_VALUE;
+ 		buckets.setBucketLifeCycleListener(new BucketLifeCycleListener<RowData, String>() {
++
+ 			@Override
+ 			public void bucketCreated(Bucket<RowData, String> bucket) {
+ 			}
+@@ -92,14 +99,6 @@ public class StreamingFileWriter extends AbstractStreamOperator<CommitMessage>
+ 				inactivePartitions.add(bucket.getBucketId());
+ 			}
+ 		});
+-
+-		helper = new StreamingFileSinkHelper<>(
+-				buckets,
+-				context.isRestored(),
+-				context.getOperatorStateStore(),
+-				getRuntimeContext().getProcessingTimeService(),
+-				bucketCheckInterval);
+-		currentWatermark = Long.MIN_VALUE;
+ 	}
+ 
+ 	@Override
+

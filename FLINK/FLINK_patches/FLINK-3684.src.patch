@@ -1,0 +1,27 @@
+diff --git a/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/CEPPatternOperator.java b/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/CEPPatternOperator.java
+index 77608177b27..153c9c9554a 100644
+--- a/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/CEPPatternOperator.java
++++ b/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/CEPPatternOperator.java
+@@ -87,8 +87,6 @@ public class CEPPatternOperator<IN> extends AbstractCEPPatternOperator<IN> {
+ 
+ 			processEvent(nfa, streamRecord.getValue(), streamRecord.getTimestamp());
+ 		}
+-
+-		output.emitWatermark(mark);
+ 	}
+ 
+ 	@Override
+diff --git a/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/KeyedCEPPatternOperator.java b/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/KeyedCEPPatternOperator.java
+index 5db8ef25a65..5d754cea52f 100644
+--- a/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/KeyedCEPPatternOperator.java
++++ b/flink-libraries/flink-cep/src/main/java/org/apache/flink/cep/operator/KeyedCEPPatternOperator.java
+@@ -163,8 +163,6 @@ public class KeyedCEPPatternOperator<IN, KEY> extends AbstractCEPPatternOperator
+ 				processEvent(nfa, streamRecord.getValue(), streamRecord.getTimestamp());
+ 			}
+ 		}
+-
+-		output.emitWatermark(mark);
+ 	}
+ 
+ 	@Override
+

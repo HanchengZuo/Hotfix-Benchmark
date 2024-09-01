@@ -1,0 +1,55 @@
+You are an Automated Program Repair Tool for Hot Fix.
+
+Please help me check and fix the bugs in the Java code file I uploaded. Maintain the original code structure and logic as much as possible, modifying only the problematic parts. Finally, provide the complete updated code files so that I can directly replace the old code for testing.
+
+Main code file: MesosResourceManager.java
+
+Test Case for Verification:
+```java
+	@Test
+	public void testWorkerFailed() throws Exception {
+		new Context() {{
+			// set the initial persistent state with a launched worker
+			MesosWorkerStore.Worker worker1launched = MesosWorkerStore.Worker.newWorker(task1).launchWorker(slave1, slave1host);
+			when(rmServices.workerStore.getFrameworkID()).thenReturn(Option.apply(framework1));
+			when(rmServices.workerStore.recoverWorkers()).thenReturn(singletonList(worker1launched));
+			when(rmServices.workerStore.newTaskID()).thenReturn(task2);
+			startResourceManager();
+
+			// tell the RM that a task failed
+			when(rmServices.workerStore.removeWorker(task1)).thenReturn(true);
+			resourceManager.taskTerminated(new TaskMonitor.TaskTerminated(task1, Protos.TaskStatus.newBuilder()
+				.setTaskId(task1).setSlaveId(slave1).setState(Protos.TaskState.TASK_FAILED).build()));
+			// verify that the instance state was updated
+			verify(rmServices.workerStore).removeWorker(task1);
+			assertThat(resourceManager.workersInLaunch.entrySet(), empty());
+			assertThat(resourceManager.workersBeingReturned.entrySet(), empty());
+			assertThat(resourceManager.workersInNew, hasKey(extractResourceID(task2)));
+
+			// verify that `closeTaskManagerConnection` was called
+			assertThat(resourceManager.closedTaskManagerConnections, hasItem(extractResourceID(task1)));
+		}};
+	}
+```
+
+Error Stack Trace from the Failing Test Case:
+```
+testWorkerFailed(org.apache.flink.mesos.runtime.clusterframework.MesosResourceManagerTest)  Time elapsed: 0.065 sec  <<< FAILURE!
+java.lang.AssertionError:
+Expected: map containing [<taskmanager-00002>->ANYTHING]
+     but: map was []
+        at org.hamcrest.MatcherAssert.assertThat(MatcherAssert.java:20)
+        at org.junit.Assert.assertThat(Assert.java:956)
+        at org.junit.Assert.assertThat(Assert.java:923)
+        at org.apache.flink.mesos.runtime.clusterframework.MesosResourceManagerTest$8.<init>(MesosResourceManagerTest.java:699)
+        at org.apache.flink.mesos.runtime.clusterframework.MesosResourceManagerTest.testWorkerFailed(MesosResourceManagerTest.java:682)
+```
+
+Localized Bug Locations (from fault localization):
+- File: `MesosResourceManager.java`
+  - method: `public void taskTerminated(TaskMonitor.TaskTerminated message)`
+
+Issue title for this bug:
+```text
+MesosResourceManager sometimes does not request new Containers
+```

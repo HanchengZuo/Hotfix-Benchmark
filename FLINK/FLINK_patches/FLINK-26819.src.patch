@@ -1,0 +1,14 @@
+diff --git a/flink-table/flink-table-runtime/src/main/java/org/apache/flink/table/runtime/operators/rank/AppendOnlyFirstNFunction.java b/flink-table/flink-table-runtime/src/main/java/org/apache/flink/table/runtime/operators/rank/AppendOnlyFirstNFunction.java
+index df289b5b98a..581f24c8ec7 100644
+--- a/flink-table/flink-table-runtime/src/main/java/org/apache/flink/table/runtime/operators/rank/AppendOnlyFirstNFunction.java
++++ b/flink-table/flink-table-runtime/src/main/java/org/apache/flink/table/runtime/operators/rank/AppendOnlyFirstNFunction.java
+@@ -89,7 +89,7 @@ public class AppendOnlyFirstNFunction extends AbstractTopNFunction {
+         currentRank += 1;
+         state.update(currentRank);
+ 
+-        if (outputRankNumber || hasOffset()) {
++        if (outputRankNumber) {
+             collectInsert(out, input, currentRank);
+         } else {
+             collectInsert(out, input);
+

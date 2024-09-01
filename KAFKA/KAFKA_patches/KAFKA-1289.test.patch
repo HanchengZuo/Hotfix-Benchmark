@@ -1,0 +1,56 @@
+diff --git a/core/src/test/scala/other/kafka/TestLogCleaning.scala b/core/src/test/scala/other/kafka/TestLogCleaning.scala
+index d20d132de6..22b16e5498 100644
+--- a/core/src/test/scala/other/kafka/TestLogCleaning.scala
++++ b/core/src/test/scala/other/kafka/TestLogCleaning.scala
+@@ -243,11 +243,11 @@ object TestLogCleaning {
+                       percentDeletes: Int): File = {
+     val producerProps = new Properties
+     producerProps.setProperty("producer.type", "async")
+-    producerProps.setProperty("metadata.broker.list", brokerUrl)
++    producerProps.setProperty("broker.list", brokerUrl)
+     producerProps.setProperty("serializer.class", classOf[StringEncoder].getName)
+     producerProps.setProperty("key.serializer.class", classOf[StringEncoder].getName)
+     producerProps.setProperty("queue.enqueue.timeout.ms", "-1")
+-    producerProps.setProperty("batch.num.messages", 1000.toString)
++    producerProps.setProperty("batch.size", 1000.toString)
+     val producer = new Producer[String, String](new ProducerConfig(producerProps))
+     val rand = new Random(1)
+     val keyCount = (messages / dups).toInt
+@@ -275,9 +275,8 @@ object TestLogCleaning {
+   def makeConsumer(zkUrl: String, topics: Array[String]): ZookeeperConsumerConnector = {
+     val consumerProps = new Properties
+     consumerProps.setProperty("group.id", "log-cleaner-test-" + new Random().nextInt(Int.MaxValue))
+-    consumerProps.setProperty("zookeeper.connect", zkUrl)
+-    consumerProps.setProperty("consumer.timeout.ms", (20*1000).toString)
+-    consumerProps.setProperty("auto.offset.reset", "smallest")
++    consumerProps.setProperty("zk.connect", zkUrl)
++    consumerProps.setProperty("consumer.timeout.ms", (10*1000).toString)
+     new ZookeeperConsumerConnector(new ConsumerConfig(consumerProps))
+   }
+   
+diff --git a/core/src/test/scala/unit/kafka/log/CleanerTest.scala b/core/src/test/scala/unit/kafka/log/CleanerTest.scala
+index d10e4f4ccb..51cd94b316 100644
+--- a/core/src/test/scala/unit/kafka/log/CleanerTest.scala
++++ b/core/src/test/scala/unit/kafka/log/CleanerTest.scala
+@@ -33,7 +33,7 @@ import kafka.message._
+ class CleanerTest extends JUnitSuite {
+   
+   val dir = TestUtils.tempDir()
+-  val logConfig = LogConfig(segmentSize=1024, maxIndexSize=1024, compact=true)
++  val logConfig = LogConfig(segmentSize=1024, maxIndexSize=1024, dedupe=true)
+   val time = new MockTime()
+   val throttler = new Throttler(desiredRatePerSec = Double.MaxValue, checkIntervalMs = Long.MaxValue, time = time)
+   
+diff --git a/core/src/test/scala/unit/kafka/log/LogCleanerIntegrationTest.scala b/core/src/test/scala/unit/kafka/log/LogCleanerIntegrationTest.scala
+index 9aeb69d493..1de3ef0435 100644
+--- a/core/src/test/scala/unit/kafka/log/LogCleanerIntegrationTest.scala
++++ b/core/src/test/scala/unit/kafka/log/LogCleanerIntegrationTest.scala
+@@ -101,7 +101,7 @@ class LogCleanerIntegrationTest extends JUnitSuite {
+       val dir = new File(logDir, "log-" + i)
+       dir.mkdirs()
+       val log = new Log(dir = dir,
+-                        LogConfig(segmentSize = segmentSize, maxIndexSize = 100*1024, fileDeleteDelayMs = deleteDelay, compact = true),
++                        LogConfig(segmentSize = segmentSize, maxIndexSize = 100*1024, fileDeleteDelayMs = deleteDelay, dedupe = true),
+                         recoveryPoint = 0L,
+                         scheduler = time.scheduler,
+                         time = time)

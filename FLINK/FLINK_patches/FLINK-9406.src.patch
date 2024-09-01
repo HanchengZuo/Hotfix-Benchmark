@@ -1,0 +1,14 @@
+diff --git a/flink-runtime/src/main/java/org/apache/flink/runtime/jobmaster/JobMaster.java b/flink-runtime/src/main/java/org/apache/flink/runtime/jobmaster/JobMaster.java
+index aad81a13856..1df9d89f201 100644
+--- a/flink-runtime/src/main/java/org/apache/flink/runtime/jobmaster/JobMaster.java
++++ b/flink-runtime/src/main/java/org/apache/flink/runtime/jobmaster/JobMaster.java
+@@ -619,7 +619,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
+ 						.getProducer()
+ 						.getCurrentExecutionAttempt();
+ 
+-				if (producerExecution.getAttemptId().equals(resultPartitionId.getProducerId())) {
++				if (producerExecution.getAttemptId() == resultPartitionId.getProducerId()) {
+ 					return CompletableFuture.completedFuture(producerExecution.getState());
+ 				} else {
+ 					return FutureUtils.completedExceptionally(new PartitionProducerDisposedException(resultPartitionId));
+
